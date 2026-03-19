@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@300;400;500;600;700&family=Oswald:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-body: 'Barlow', 'Helvetica Neue', Arial, sans-serif;
+  --font-heading: 'Oswald', 'Impact', 'Helvetica Neue', sans-serif;
+
+  --color-page: #050608;
+  --color-text: #f4f5f7;
+  --color-text-muted: rgba(244, 245, 247, 0.65);
+  --color-accent: #c8102e;
+  --color-highlight: #e85a2a;
+
+  --color-surface: #15181f;
+  --color-current-surface: #0f1016;
+  --color-card: rgba(33, 37, 46, 0.82);
+  --color-table-bg: rgba(12, 13, 18, 0.9);
+  --color-table-surface: rgba(16, 18, 24, 0.95);
+  --color-table-header: rgba(24, 27, 35, 0.95);
+  --color-participant-bg: rgba(33, 36, 44, 0.95);
+
+  --color-border: rgba(255, 255, 255, 0.08);
+  --color-border-strong: rgba(255, 255, 255, 0.18);
+
+  --shadow-elevated:
+    0 20px 48px rgba(0, 0, 0, 0.45),
+    0 2px 12px rgba(0, 0, 0, 0.35);
+
+  font-family: var(--font-body);
+  font-size: clamp(16px, 0.95vw + 12px, 18px);
+  line-height: 1.6;
+  color: var(--color-text);
+  background-color: var(--color-page);
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  color: var(--color-text);
+}
+
+#root {
+  min-height: 100vh;
+  width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-heading);
+  margin: 0;
+}
+
+p {
+  margin: 0;
+}
