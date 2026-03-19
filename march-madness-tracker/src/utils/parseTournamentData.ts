@@ -1,6 +1,14 @@
 import { DateTime } from 'luxon'
 import { read, utils } from 'xlsx'
-import type { Matchup, TeamInfo, TournamentData, TournamentDay } from '../types'
+import type {
+  Matchup,
+  MatchupDifference,
+  ParticipantComparisonMap,
+  ParticipantOpponentComparison,
+  TeamInfo,
+  TournamentData,
+  TournamentDay,
+} from '../types'
 
 const ET_ZONE = 'America/New_York'
 const CT_ZONE = 'America/Chicago'
@@ -135,6 +143,126 @@ const hydrateMatchup = (
   picks,
 })
 
+const normalizePick = (value: string | null | undefined): string | null => {
+  if (!value) return null
+  return value.replace(/\s+/g, ' ').trim().toLowerCase()
+}
+
+const createDifferenceEntry = (
+  matchup: Matchup,
+  primaryPick: string | null,
+  opponentPick: string | null,
+): MatchupDifference => ({
+  matchupId: matchup.id,
+  label: matchup.label,
+  stage: matchup.stage,
+  dateLabel: matchup.dateLabel,
+  teams: matchup.teams,
+  picks: {
+    primary: primaryPick ?? '—',
+    opponent: opponentPick ?? '—',
+  },
+})
+
+const computeComparisonPair = (
+  primary: string,
+  opponent: string,
+  matchups: Matchup[],
+): {
+  primaryComparison: ParticipantOpponentComparison
+  opponentComparison: ParticipantOpponentComparison
+} => {
+  let comparedCount = 0
+  let matchingCount = 0
+
+  const differencesForPrimary: MatchupDifference[] = []
+  const differencesForOpponent: MatchupDifference[] = []
+
+  matchups.forEach((matchup) => {
+    const primaryPick = matchup.picks[primary] ?? null
+    const opponentPick = matchup.picks[opponent] ?? null
+
+    const normalizedPrimary = normalizePick(primaryPick)
+    const normalizedOpponent = normalizePick(opponentPick)
+
+    const bothPicked = normalizedPrimary !== null && normalizedOpponent !== null
+
+    if (bothPicked) {
+      comparedCount += 1
+
+      if (normalizedPrimary === normalizedOpponent) {
+        matchingCount += 1
+        return
+      }
+    }
+
+    if (normalizedPrimary !== normalizedOpponent) {
+      differencesForPrimary.push(createDifferenceEntry(matchup, primaryPick, opponentPick))
+      differencesForOpponent.push(createDifferenceEntry(matchup, opponentPick, primaryPick))
+    }
+  })
+
+  const similarity = comparedCount > 0 ? matchingCount / comparedCount : null
+
+  const primaryComparison: ParticipantOpponentComparison = {
+    opponent,
+    similarity,
+    comparedCount,
+    matchingCount,
+    differences: differencesForPrimary,
+  }
+
+  const opponentComparison: ParticipantOpponentComparison = {
+    opponent: primary,
+    similarity,
+    comparedCount,
+    matchingCount,
+    differences: differencesForOpponent,
+  }
+
+  return { primaryComparison, opponentComparison }
+}
+
+const buildParticipantComparisons = (
+  participants: string[],
+  days: TournamentDay[],
+): ParticipantComparisonMap => {
+  const comparisons: ParticipantComparisonMap = participants.reduce<ParticipantComparisonMap>((acc, participant) => {
+    acc[participant] = []
+    return acc
+  }, {})
+
+  const allMatchups = days.flatMap((day) => day.matchups)
+
+  for (let i = 0; i < participants.length; i += 1) {
+    for (let j = i + 1; j < participants.length; j += 1) {
+      const primary = participants[i]
+      const opponent = participants[j]
+
+      const { primaryComparison, opponentComparison } = computeComparisonPair(primary, opponent, allMatchups)
+
+      comparisons[primary].push(primaryComparison)
+      comparisons[opponent].push(opponentComparison)
+    }
+  }
+
+  // Sort opponent lists by similarity (descending) then alphabetically
+  participants.forEach((participant) => {
+    comparisons[participant].sort((a, b) => {
+      const similarityA = a.similarity ?? -1
+      const similarityB = b.similarity ?? -1
+
+      if (similarityA === similarityB) {
+        return a.opponent.localeCompare(b.opponent)
+      }
+
+      return similarityB - similarityA
+    })
+  })
+
+  return comparisons
+}
+
 export const isMatchupLive = (matchup: Matchup, reference: DateTime): boolean => {
   if (!matchup.timeCentral) return false
   const start = matchup.timeCentral
@@ -214,9 +342,11 @@ export const loadTournamentData = async (): Promise<TournamentData> => {
   })
 
   const populatedDays = days.filter((day) => day.matchups.length > 0)
+  const comparisons = buildParticipantComparisons(participants, populatedDays)
 
   return {
     participants,
     days: populatedDays,
+    comparisons,
   }
 }

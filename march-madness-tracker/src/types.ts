@@ -30,4 +30,27 @@ export interface TournamentDay {
 export interface TournamentData {
   participants: string[]
   days: TournamentDay[]
+  comparisons: ParticipantComparisonMap
 }
+
+export interface MatchupDifference {
+  matchupId: string
+  label: string
+  stage: string
+  dateLabel: string
+  teams: [TeamInfo, TeamInfo]
+  picks: {
+    primary: string
+    opponent: string
+  }
+}
+
+export interface ParticipantOpponentComparison {
+  opponent: string
+  similarity: number | null
+  comparedCount: number
+  matchingCount: number
+  differences: MatchupDifference[]
+}
+
+export type ParticipantComparisonMap = Record<string, ParticipantOpponentComparison[]>

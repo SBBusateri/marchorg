@@ -3,6 +3,7 @@ import { DateTime } from 'luxon'
 import CurrentGamesSection from './components/CurrentGamesSection'
 import DateSelector from './components/DateSelector'
 import TournamentTable from './components/TournamentTable'
+import GameDifferenceSection from './components/GameDifferenceSection'
 import type { TournamentData, TournamentDay } from './types'
 import { isMatchupLive, loadTournamentData } from './utils/parseTournamentData'
 import './App.css'
@@ -133,6 +134,11 @@ function App() {
             ) : (
               <p className="app-status">Select a date to view matchups.</p>
             )}
+
+            <GameDifferenceSection
+              participants={tournamentData.participants}
+              comparisons={tournamentData.comparisons}
+            />
           </>
         )}
       </main>
