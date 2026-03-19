@@ -44,7 +44,7 @@ const LiveGamesTable = ({ matchups, participants, liveCount }: LiveGamesTablePro
       <thead>
         <tr>
           <th className="picks-table__participant picks-table__participant--header" scope="col">
-            Participant
+            <span className="sr-only">Participant</span>
           </th>
           {matchups.map((matchup, index) => {
             const status = index < liveCount ? 'live' : 'upcoming'

@@ -52,7 +52,7 @@ const TournamentTable = ({ day, participants }: TournamentTableProps) => (
           <thead>
             <tr>
               <th className="picks-table__participant picks-table__participant--header" scope="col">
-                Participant
+                <span className="sr-only">Participant</span>
               </th>
               {day.matchups.map((matchup) => (
                 <th key={matchup.id} scope="col">
