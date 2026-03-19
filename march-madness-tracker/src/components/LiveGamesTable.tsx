@@ -18,11 +18,23 @@ const getCellState = (matchup: Matchup, pick: string | null) => {
   }
 
   const normalizedPick = normalize(pick)
-  const didMatch = matchup.teams.some((team) => normalize(team.name) === normalizedPick)
+  if (normalize(matchup.teams[0].name) === normalizedPick) {
+    return {
+      label: pick,
+      variant: 'selected-top' as const,
+    }
+  }
+
+  if (normalize(matchup.teams[1].name) === normalizedPick) {
+    return {
+      label: pick,
+      variant: 'selected-bottom' as const,
+    }
+  }
 
   return {
     label: pick,
-    variant: didMatch ? 'selected' : 'neutral',
+    variant: 'neutral' as const,
   }
 }
 

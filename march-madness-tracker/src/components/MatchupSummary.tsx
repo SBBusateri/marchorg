@@ -23,8 +23,12 @@ const MatchupSummary = ({ matchup, className, compact = false }: MatchupSummaryP
 
   return (
     <div className={joinClassNames('matchup-summary', compact && 'matchup-summary--compact', className)}>
-      <div className="matchup-summary__line">{formatTeamLabel(matchup.teams[0], ' vs.')}</div>
-      <div className="matchup-summary__line">{formatTeamLabel(matchup.teams[1])}</div>
+      <div className="matchup-summary__line matchup-summary__line--primary">
+        {formatTeamLabel(matchup.teams[0], ' vs.')}
+      </div>
+      <div className="matchup-summary__line matchup-summary__line--secondary">
+        {formatTeamLabel(matchup.teams[1])}
+      </div>
       <div className="matchup-summary__meta">| {metaPieces.join(' | ')} |</div>
     </div>
   )
