@@ -115,8 +115,17 @@ const parseMatchupLabel = (label: string, date: DateTime): Omit<Matchup, 'picks'
 
   const [teamOneRaw, teamTwoRaw] = teamsPart.split(/vs\.?/i)
 
-  const teamOne = parseTeam(teamOneRaw ?? '')
-  const teamTwo = parseTeam(teamTwoRaw ?? '')
+  let teamOne = parseTeam(teamOneRaw ?? '')
+  let teamTwo = parseTeam(teamTwoRaw ?? '')
+
+  if (!teamTwo.name) {
+    const teamSegments = teamsPart.match(/\([^()]+\)\s*[^()]+/g)
+
+    if (teamSegments && teamSegments.length >= 2) {
+      teamOne = parseTeam(teamSegments[0])
+      teamTwo = parseTeam(teamSegments[1])
+    }
+  }
 
   const { timeCentral, timeEastern, formattedCentralTime } = parseTime(timePart, date)
 

@@ -25,7 +25,11 @@ function App() {
         setState('loading')
         const data = await loadTournamentData()
         setTournamentData(data)
-        setSelectedDayId(data.days[0]?.id ?? null)
+
+        const now = DateTime.now().setZone('America/New_York')
+        const upcomingDay = data.days.find((day) => day.date.setZone('America/New_York').endOf('day') >= now)
+        const fallbackDay = data.days[0]
+        setSelectedDayId(upcomingDay?.id ?? fallbackDay?.id ?? null)
         setState('ready')
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unable to load bracket data.'
@@ -45,10 +49,45 @@ function App() {
     return () => window.clearInterval(interval)
   }, [])
 
+  const orderedDays = useMemo(() => {
+    if (!tournamentData) return []
+
+    const nowET = referenceTime.setZone('America/New_York')
+
+    const current: TournamentDay[] = []
+    const upcoming: TournamentDay[] = []
+    const past: TournamentDay[] = []
+
+    tournamentData.days.forEach((day) => {
+      const dayStart = day.date.setZone('America/New_York').startOf('day')
+      const dayEnd = day.date.setZone('America/New_York').endOf('day')
+
+      if (nowET >= dayStart && nowET <= dayEnd) {
+        current.push(day)
+        return
+      }
+
+      if (dayStart > nowET) {
+        upcoming.push(day)
+        return
+      }
+
+      past.push(day)
+    })
+
+    const sortByDate = (days: TournamentDay[]) =>
+      days.slice().sort((a, b) => a.date.toMillis() - b.date.toMillis())
+
+    return [...sortByDate(current), ...sortByDate(upcoming), ...sortByDate(past)]
+  }, [referenceTime, tournamentData])
+
   const selectedDay: TournamentDay | null = useMemo(() => {
-    if (!tournamentData || !selectedDayId) return null
-    return tournamentData.days.find((day) => day.id === selectedDayId) ?? tournamentData.days[0] ?? null
-  }, [selectedDayId, tournamentData])
+    if (orderedDays.length === 0) return null
+    if (!selectedDayId) {
+      return orderedDays[0]
+    }
+    return orderedDays.find((day) => day.id === selectedDayId) ?? orderedDays[0]
+  }, [orderedDays, selectedDayId])
 
   const currentGames = useMemo(
     (): { matchups: TournamentDay['matchups']; status: CurrentGamesStatus; liveCount: number } => {
@@ -123,11 +162,7 @@ function App() {
               participants={tournamentData.participants}
               liveCount={currentGames.liveCount}
             />
-            <DateSelector
-              days={tournamentData.days}
-              selectedDayId={selectedDayId}
-              onSelect={handleDaySelect}
-            />
+            <DateSelector days={orderedDays} selectedDayId={selectedDayId} onSelect={handleDaySelect} />
 
             {selectedDay ? (
               <TournamentTable day={selectedDay} participants={tournamentData.participants} />

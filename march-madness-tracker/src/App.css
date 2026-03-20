@@ -620,8 +620,22 @@
 }
 
 .picks-table__cell--neutral {
+  background: rgba(114, 4, 4, 0.317);
+  color: var(--color-text-muted);
+}
+
+.picks-table__cell--neutral span {
+  text-decoration: line-through;
+
+}
+
+.picks-table__cell--no-strike {
   background: rgba(255, 255, 255, 0.05);
   color: var(--color-text-muted);
+}
+
+.picks-table__cell--no-strike span {
+  text-decoration: none;
 }
 
 .picks-table__cell--empty {

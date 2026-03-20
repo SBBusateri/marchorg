@@ -7,7 +7,13 @@ interface LiveGamesTableProps {
   liveCount: number
 }
 
-const normalize = (value: string) => value.replace(/\s+/g, ' ').trim().toLowerCase()
+const normalize = (value: string) =>
+  value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\((?:\d+[A-Za-z]?)\)\s*/, '')
+    .replace(/\s*\((?:\d+[A-Za-z]?)\)\s*$/, '')
+    .toLowerCase()
 
 const getCellState = (matchup: Matchup, pick: string | null) => {
   if (!pick) {
@@ -35,6 +41,7 @@ const getCellState = (matchup: Matchup, pick: string | null) => {
   return {
     label: pick,
     variant: 'neutral' as const,
+    suppressStrikethrough: /\bgame\b/i.test(matchup.label),
   }
 }
 
@@ -66,7 +73,9 @@ const LiveGamesTable = ({ matchups, participants, liveCount }: LiveGamesTablePro
             {matchups.map((matchup, index) => {
               const status = index < liveCount ? 'live' : 'upcoming'
               const state = getCellState(matchup, matchup.picks[participant] ?? null)
-              const className = `picks-table__cell picks-table__cell--${state.variant} picks-table__cell--${status}`
+              const className = `picks-table__cell picks-table__cell--${state.variant} picks-table__cell--${status} ${
+                state.suppressStrikethrough ? 'picks-table__cell--no-strike' : ''
+              }`.trim()
               return (
                 <td key={`${participant}-${matchup.id}`} className={className}>
                   <span>{state.label}</span>
