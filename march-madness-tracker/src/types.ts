@@ -27,10 +27,13 @@ export interface TournamentDay {
   matchups: Matchup[]
 }
 
+export type NeedsToWinMap = Record<string, string[]>
+
 export interface TournamentData {
   participants: string[]
   days: TournamentDay[]
   comparisons: ParticipantComparisonMap
+  needsToWin: NeedsToWinMap
 }
 
 export interface MatchupDifference {

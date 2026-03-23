@@ -2,9 +2,10 @@ import { useEffect, useMemo, useState } from 'react'
 import { DateTime } from 'luxon'
 import CurrentGamesSection from './components/CurrentGamesSection'
 import DateSelector from './components/DateSelector'
+import NeedsToWinTable from './components/NeedsToWinTable'
 import TournamentTable from './components/TournamentTable'
 import GameDifferenceSection from './components/GameDifferenceSection'
-import type { TournamentData, TournamentDay } from './types'
+import type { Matchup, TournamentData, TournamentDay } from './types'
 import { isMatchupLive, loadTournamentData } from './utils/parseTournamentData'
 import './App.css'
 
@@ -96,38 +97,33 @@ function App() {
       }
 
       const allMatchups = tournamentData.days.flatMap((day) => day.matchups)
-      const sortedWithTimes = allMatchups
-        .filter((matchup) => matchup.timeCentral)
-        .sort((a, b) => (a.timeCentral!.toMillis() ?? 0) - (b.timeCentral!.toMillis() ?? 0))
 
-      if (sortedWithTimes.length === 0) {
-        return { matchups: [], status: 'empty', liveCount: 0 }
-      }
+      const live = allMatchups
+        .filter((matchup) => matchup.timeCentral)
+        .filter((matchup) => isMatchupLive(matchup, referenceTime))
+        .sort((a, b) => a.timeCentral!.toMillis() - b.timeCentral!.toMillis())
+
+      const upcomingWithTimes = allMatchups
+        .filter((matchup) => matchup.timeCentral && matchup.timeCentral > referenceTime)
+        .sort((a, b) => a.timeCentral!.toMillis() - b.timeCentral!.toMillis())
+
+      const referenceDayStart = referenceTime.startOf('day')
+      const upcomingWithoutTimes = allMatchups
+        .filter((matchup) => !matchup.timeCentral)
+        .filter((matchup) => matchup.date.setZone('America/Chicago').endOf('day') >= referenceDayStart)
+        .sort((a, b) => a.date.toMillis() - b.date.toMillis())
 
       const selected: TournamentDay['matchups'] = []
-      const live = sortedWithTimes.filter((matchup) => isMatchupLive(matchup, referenceTime))
 
-      live.forEach((matchup) => {
-        if (selected.length < 4) {
-          selected.push(matchup)
-        }
-      })
-
-      const upcoming = sortedWithTimes.filter((matchup) => matchup.timeCentral && matchup.timeCentral > referenceTime)
-
-      upcoming.forEach((matchup) => {
-        if (selected.length < 4 && !selected.some((existing) => existing.id === matchup.id)) {
-          selected.push(matchup)
-        }
-      })
-
-      if (selected.length < 4) {
-        sortedWithTimes.forEach((matchup) => {
-          if (selected.length < 4 && !selected.some((existing) => existing.id === matchup.id)) {
-            selected.push(matchup)
-          }
-        })
+      const addMatchup = (matchup: Matchup) => {
+        if (selected.length >= 4) return
+        if (selected.some((existing) => existing.id === matchup.id)) return
+        selected.push(matchup)
       }
+
+      live.forEach(addMatchup)
+      upcomingWithTimes.forEach(addMatchup)
+      upcomingWithoutTimes.forEach(addMatchup)
 
       const liveCount = Math.min(live.length, selected.length)
 
@@ -156,6 +152,8 @@ function App() {
 
         {state === 'ready' && tournamentData && (
           <>
+            <NeedsToWinTable needsToWin={tournamentData.needsToWin} participants={tournamentData.participants} />
+
             <CurrentGamesSection
               matchups={currentGames.matchups}
               status={currentGames.status}

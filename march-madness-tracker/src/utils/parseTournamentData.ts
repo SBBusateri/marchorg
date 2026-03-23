@@ -3,6 +3,7 @@ import { read, utils } from 'xlsx'
 import type {
   Matchup,
   MatchupDifference,
+  NeedsToWinMap,
   ParticipantComparisonMap,
   ParticipantOpponentComparison,
   TeamInfo,
@@ -20,7 +21,8 @@ const LIVE_WINDOW_HOURS = 2.5
 const sanitizeString = (value: string | null | undefined): string | null => {
   if (value === undefined || value === null) return null
   const trimmed = `${value}`.trim()
-  return trimmed.length ? trimmed : null
+  const normalized = trimmed.replace(/\s+/g, ' ')
+  return normalized.length ? normalized : null
 }
 
 const parseDayHeading = (heading: string): { id: string; label: string; date: DateTime; stage: string } | null => {
@@ -64,11 +66,15 @@ const parseTime = (timePart: string | undefined, date: DateTime) => {
     }
   }
 
-  const cleaned = timePart
+  let cleaned = timePart
     .replace(/Eastern|ET|EST|EDT/gi, '')
     .replace(/\./g, '')
+    .replace(/\s*:\s*/g, ':')
+    .replace(/\s+/g, ' ')
     .toUpperCase()
     .trim()
+
+  cleaned = cleaned.replace(/\b([AP])\s*M\b/g, '$1M')
 
   if (!cleaned || cleaned === 'TBD') {
     return {
@@ -108,10 +114,33 @@ const parseTime = (timePart: string | undefined, date: DateTime) => {
 }
 
 const parseMatchupLabel = (label: string, date: DateTime): Omit<Matchup, 'picks' | 'id' | 'dateLabel' | 'stage'> => {
-  const [teamsPartRaw, timePartRaw, networkRaw] = label.split('|').map((segment) => segment?.trim())
-  const teamsPart = sanitizeString(teamsPartRaw) ?? ''
-  const timePart = sanitizeString(timePartRaw) ?? undefined
-  const network = sanitizeString(networkRaw) ?? undefined
+  const rawSegments = label.split('|').map((segment) => sanitizeString(segment))
+
+  let teamsPart = rawSegments[0] ?? ''
+  let timePart = rawSegments[1] ?? undefined
+  let network = rawSegments[2] ?? undefined
+
+  if (rawSegments.length === 2) {
+    if (rawSegments[1] && /\d/.test(rawSegments[1]!)) {
+      timePart = rawSegments[1]!
+      network = undefined
+    } else {
+      network = rawSegments[1]!
+      timePart = undefined
+    }
+  }
+
+  if (!timePart) {
+    const trailingTimeMatch = teamsPart.match(/,(?!.*,)\s*(.+)$/)
+    if (trailingTimeMatch) {
+      timePart = trailingTimeMatch[1]
+      teamsPart = teamsPart.replace(/,(?!.*,)\s*.+$/, '')
+    }
+  }
+
+  teamsPart = sanitizeString(teamsPart) ?? ''
+  timePart = sanitizeString(timePart) ?? undefined
+  network = sanitizeString(network) ?? undefined
 
   const [teamOneRaw, teamTwoRaw] = teamsPart.split(/vs\.?/i)
 
@@ -138,6 +167,40 @@ const parseMatchupLabel = (label: string, date: DateTime): Omit<Matchup, 'picks'
     formattedCentralTime,
     date,
   }
+}
+
+const initializeNeedsToWinMap = (participants: string[]): NeedsToWinMap =>
+  participants.reduce<NeedsToWinMap>((acc, participant) => {
+    acc[participant] = []
+    return acc
+  }, {})
+
+const parseNeedsToWinSection = (
+  rows: (string | null | undefined)[][],
+  startIndex: number,
+  participants: string[],
+  existing: NeedsToWinMap,
+): NeedsToWinMap => {
+  const needsMap = { ...existing }
+
+  for (let rowIndex = startIndex + 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex]
+    if (!row) continue
+
+    const label = sanitizeString(row[0])
+    if (label) {
+      break
+    }
+
+    participants.forEach((participant, participantIndex) => {
+      const entry = sanitizeString(row[participantIndex + 1])
+      if (entry) {
+        needsMap[participant] = [...(needsMap[participant] ?? []), entry]
+      }
+    })
+  }
+
+  return needsMap
 }
 
 const hydrateMatchup = (
@@ -315,11 +378,19 @@ export const loadTournamentData = async (): Promise<TournamentData> => {
 
   let currentDay: TournamentDay | undefined = days[0]
 
-  rows.slice(1).forEach((row) => {
+  let needsToWin = initializeNeedsToWinMap(participants)
+
+  for (let rowIndex = 1; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex]
     const cell = sanitizeString(row[0])
 
+    if (cell && cell.toLowerCase().includes('needs to win')) {
+      needsToWin = parseNeedsToWinSection(rows, rowIndex, participants, needsToWin)
+      break
+    }
+
     if (!cell) {
-      return
+      continue
     }
 
     const dayHeading = parseDayHeading(cell)
@@ -330,11 +401,11 @@ export const loadTournamentData = async (): Promise<TournamentData> => {
         matchups: [],
       }
       days.push(currentDay)
-      return
+      continue
     }
 
     if (!currentDay) {
-      return
+      continue
     }
 
     const baseMatchup = parseMatchupLabel(cell, currentDay.date)
@@ -348,7 +419,7 @@ export const loadTournamentData = async (): Promise<TournamentData> => {
 
     const matchup = hydrateMatchup(baseMatchup, currentDay, picks)
     currentDay.matchups.push(matchup)
-  })
+  }
 
   const populatedDays = days.filter((day) => day.matchups.length > 0)
   const comparisons = buildParticipantComparisons(participants, populatedDays)
@@ -357,5 +428,6 @@ export const loadTournamentData = async (): Promise<TournamentData> => {
     participants,
     days: populatedDays,
     comparisons,
+    needsToWin,
   }
 }
